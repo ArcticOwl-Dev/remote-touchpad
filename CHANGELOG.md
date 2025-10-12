@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2 (2025-10-12)
+
+* Update dependencies
+
 ## 1.5.0 (2025-03-18)
 
 * Add restore token support for the remote desktop portal
