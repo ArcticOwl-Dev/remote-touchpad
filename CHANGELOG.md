@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3 (2025-12-24)
+
+* Update dependencies
+
 ## 1.5.2 (2025-10-12)
 
 * Update dependencies
