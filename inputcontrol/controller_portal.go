@@ -24,6 +24,7 @@ package inputcontrol
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hkdf"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
@@ -35,7 +36,6 @@ import (
 	"slices"
 
 	"github.com/godbus/dbus/v5"
-	"golang.org/x/crypto/hkdf"
 )
 
 const (
@@ -230,9 +230,8 @@ type secretStore struct {
 }
 
 func newSecretStore(key []byte, filename string) (*secretStore, error) {
-	hkdf := hkdf.New(sha256.New, key, nil, nil)
-	derivedKey := make([]byte, 32)
-	if _, err := io.ReadFull(hkdf, derivedKey); err != nil {
+	derivedKey, err := hkdf.Key(sha256.New, key, nil, "", 32)
+	if err != nil {
 		return nil, err
 	}
 	block, err := aes.NewCipher(derivedKey)
