@@ -41,10 +41,12 @@ socket.addEventListener("close", () => {
 window.app = {
     key: inputController.keyboardKey.bind(inputController),
     text: inputController.keyboardText.bind(inputController),
+    runCommand: inputController.runCommand.bind(inputController),
     toggleFullscreen: ui.toggleFullscreen.bind(ui),
     showTextInput: ui.showTextInput.bind(ui),
     showKeys: ui.showKeys.bind(ui),
     setKeysPage: ui.setKeysPage.bind(ui),
+    showCustomCommands: ui.showCustomCommands.bind(ui),
 };
 for (const name in inputcontrollerModule) {
     if (name.startsWith("KEY_")) {

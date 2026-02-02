@@ -34,6 +34,9 @@ const keysScene = document.getElementById("keys");
 const keysPages = keysScene.querySelectorAll(":scope > .page");
 const textInputScene = document.getElementById("text-input");
 const textInput = textInputScene.querySelector("textarea");
+const customScene = document.getElementById("custom");
+const customButtonsContainer = document.getElementById("custom-buttons");
+const customCommandsButton = document.getElementById("custom-commands-button");
 const mouseScene = document.getElementById("mouse");
 const sendText = document.getElementById("send-text");
 
@@ -73,6 +76,26 @@ export default class UI {
         this.#mouse.configure(config);
         this.#keyboard.configure(config);
         this.#touchpad.configure(config);
+        const customButtons = config.customButtons;
+        if (customButtons && customButtons.length > 0) {
+            customCommandsButton.classList.remove("hidden");
+            customButtonsContainer.textContent = "";
+            for (let i = 0; i < customButtons.length; i += 1) {
+                const entry = customButtons[i];
+                const btn = document.createElement("button");
+                btn.textContent = entry.icon || entry.label || "";
+                btn.setAttribute("tabindex", "-1");
+                const index = i;
+                btn.addEventListener("click", (event) => {
+                    this.#handleButtonClick(event);
+                    window.app.runCommand(index);
+                });
+                customButtonsContainer.appendChild(btn);
+            }
+        } else {
+            customCommandsButton.classList.add("hidden");
+            customButtonsContainer.textContent = "";
+        }
         if (!this.#closed) {
             this.#ready = true;
         }
@@ -171,6 +194,13 @@ export default class UI {
         }
     }
 
+    showCustomCommands() {
+        this.#showScene(customScene);
+        if (history.state != "custom") {
+            history.pushState("custom", "");
+        }
+    }
+
     toggleFullscreen() {
         if (compat.fullscreenElement()) {
             compat.exitFullscreen();
@@ -192,6 +222,8 @@ export default class UI {
             this.showKeys(history.state.substr("keys:".length));
         } else if (history.state == "text-input") {
             this.showTextInput();
+        } else if (history.state == "custom") {
+            this.#showScene(customScene);
         } else {
             this.#showScene(padScene);
         }

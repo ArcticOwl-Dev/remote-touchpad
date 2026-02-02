@@ -22,6 +22,7 @@
     <button class="top left" onclick="app.showKeys()">≡</button>
     <button class="bottom left visible-if-fullscreen-enabled" onclick="app.toggleFullscreen()">⤢</button>
     <button class="bottom right" onclick="app.showTextInput()">⌨</button>
+    <button id="custom-commands-button" class="top right hidden" onclick="app.showCustomCommands()">📋</button>
 </div>
 
 <div id="text-input" class="scene">
@@ -93,6 +94,11 @@
     </div>
     <button class="top right" onclick="app.setKeysPage(1, true)">⮂</button>
     <button class="top left" onclick="history.back()">⯇</button>
+</div>
+
+<div id="custom" class="scene">
+    <button class="top left" onclick="history.back()">⯇</button>
+    <div id="custom-buttons" class="page"></div>
 </div>
 
 <div id="mouse" class="scene keyboard-input allow-fullscreen">

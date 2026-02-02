@@ -24,6 +24,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -35,6 +36,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -47,21 +51,50 @@ const (
 	authenticationRateBurst int           = 10
 	challengeLength         int           = 8
 	defaultBind             string        = ":0"
-	version                 string        = "1.5.3"
+	version                 string        = "1.6.0"
 	prettyAppName           string        = "Remote Touchpad"
 )
 
-type config struct {
-	UpdateRate       uint    `json:"updateRate"`
-	ScrollSpeed      float64 `json:"scrollSpeed"`
-	MoveSpeed        float64 `json:"moveSpeed"`
-	MouseScrollSpeed float64 `json:"mouseScrollSpeed"`
-	MouseMoveSpeed   float64 `json:"mouseMoveSpeed"`
+type customButton struct {
+	Label   string `json:"label"`
+	Icon    string `json:"icon"`
+	Command string `json:"command"`
 }
 
-func processCommand(controller inputcontrol.Controller, command string) error {
+type config struct {
+	UpdateRate       uint           `json:"updateRate"`
+	ScrollSpeed      float64        `json:"scrollSpeed"`
+	MoveSpeed        float64        `json:"moveSpeed"`
+	MouseScrollSpeed float64        `json:"mouseScrollSpeed"`
+	MouseMoveSpeed   float64        `json:"mouseMoveSpeed"`
+	CustomButtons    []customButton `json:"customButtons,omitempty"`
+}
+
+func processCommand(controller inputcontrol.Controller, customButtons []customButton, command string) error {
 	if len(command) == 0 {
 		return errors.New("empty command")
+	}
+	if command[0] == 'c' {
+		index, err := strconv.ParseInt(command[1:], 10, 32)
+		if err != nil || index < 0 || int(index) >= len(customButtons) {
+			return errors.New("invalid custom button index")
+		}
+		cmdStr := customButtons[index].Command
+		if cmdStr == "" {
+			return nil
+		}
+		var cmd *exec.Cmd
+		if runtime.GOOS == "windows" {
+			cmd = exec.Command("cmd", "/c", cmdStr)
+		} else {
+			cmd = exec.Command("sh", "-c", cmdStr)
+		}
+		if err := cmd.Start(); err != nil {
+			log.Printf("custom button command: %v", err)
+			return nil
+		}
+		go cmd.Wait()
+		return nil
 	}
 	if command == "S" {
 		return controller.PointerScroll(0, 0, true)
@@ -114,6 +147,40 @@ func processCommand(controller inputcontrol.Controller, command string) error {
 	return errors.New("unsupported command")
 }
 
+func defaultButtonsConfig() []customButton {
+	return []customButton{
+		{Label: "Lock screen", Icon: "🔒", Command: "xdg-screensaver lock"},
+		{Label: "Shutdown", Icon: "⏻", Command: "systemctl poweroff"},
+	}
+}
+
+func loadButtonsConfig(path string) ([]customButton, error) {
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var buttons []customButton
+	if err := json.Unmarshal(data, &buttons); err != nil {
+		return nil, err
+	}
+	return buttons, nil
+}
+
+func writeDefaultButtonsConfig(path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(defaultButtonsConfig(), "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
 type challenge struct {
 	message, expectedResponse string
 }
@@ -164,6 +231,8 @@ func main() {
 	flag.Float64Var(&config.ScrollSpeed, "scroll-speed", 1, "scroll speed multiplier")
 	flag.Float64Var(&config.MouseMoveSpeed, "mouse-move-speed", 1, "mouse move speed multiplier")
 	flag.Float64Var(&config.MouseScrollSpeed, "mouse-scroll-speed", 1, "mouse scroll speed multiplier")
+	var buttonsConfigPath string
+	flag.StringVar(&buttonsConfigPath, "buttons-config", "", "path to JSON file defining custom buttons")
 	flag.Parse()
 	if showVersion {
 		fmt.Println(version)
@@ -174,6 +243,27 @@ func main() {
 	}
 	if certFile == "" && keyFile != "" {
 		log.Fatal("TLS certificate file missing")
+	}
+	if buttonsConfigPath == "" {
+		configDir, err := os.UserConfigDir()
+		if err == nil {
+			buttonsConfigPath = filepath.Join(configDir, "remote-touchpad", "buttons.json")
+			if _, err := os.Stat(buttonsConfigPath); os.IsNotExist(err) {
+				if err := writeDefaultButtonsConfig(buttonsConfigPath); err != nil {
+					log.Printf("could not create default buttons config: %v", err)
+				}
+			}
+		}
+	}
+	if buttonsConfigPath != "" {
+		buttons, err := loadButtonsConfig(buttonsConfigPath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				log.Fatalf("buttons config: %v", err)
+			}
+		} else {
+			config.CustomButtons = buttons
+		}
 	}
 	tls := certFile != "" && keyFile != ""
 	if secret == "" {
@@ -244,7 +334,7 @@ func main() {
 			if err := websocket.Message.Receive(ws, &message); err != nil {
 				return
 			}
-			if err := processCommand(controller, message); err != nil {
+			if err := processCommand(controller, config.CustomButtons, message); err != nil {
 				log.Print(fmt.Errorf("%s controller: %w", controllerName, err))
 				return
 			}

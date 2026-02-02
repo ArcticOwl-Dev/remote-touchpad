@@ -118,4 +118,8 @@ export default class InputController {
     keyboardText(text) {
         this.#socket.send("t" + text);
     }
+
+    runCommand(index) {
+        this.#socket.send("c" + index);
+    }
 }
