@@ -31,11 +31,12 @@ var webdataFSWithPrefix embed.FS
 var webdataFS fs.FS
 
 var webdataTypes = map[string]string{
-	".css":  "text/css; charset=utf-8",
-	".html": "text/html; charset=utf-8",
-	".mjs":  "text/javascript; charset=utf-8",
-	".png":  "image/png",
-	".woff": "font/woff",
+	".css":        "text/css; charset=utf-8",
+	".html":       "text/html; charset=utf-8",
+	".mjs":        "text/javascript; charset=utf-8",
+	".png":        "image/png",
+	".woff":       "font/woff",
+	".webmanifest": "application/manifest+json; charset=utf-8",
 }
 
 func init() {
