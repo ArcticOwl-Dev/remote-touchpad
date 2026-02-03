@@ -21,6 +21,23 @@ import InputController, * as inputcontrollerModule from "./inputcontroller.mjs";
 import Socket from "./socket.mjs";
 import UI from "./ui.mjs";
 
+const STORAGE_KEY = "remoteTouchpadUrl";
+
+// Samsung (and some other browsers) open "Add to Home screen" without the hash, so the secret is lost.
+// Save the full URL when we have a hash; when opened without a hash, redirect to the saved URL.
+if (!window.location.hash || window.location.hash === "#") {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved && saved.startsWith("http")) {
+            window.location.replace(saved);
+        }
+    } catch (_) {}
+} else {
+    try {
+        localStorage.setItem(STORAGE_KEY, window.location.href);
+    } catch (_) {}
+}
+
 const url = new URL("ws", location.href);
 url.protocol = url.protocol == "http:" ? "ws:" : "wss:";
 
