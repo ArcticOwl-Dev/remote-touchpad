@@ -23,6 +23,11 @@ import UI from "./ui.mjs";
 
 const STORAGE_KEY = "remoteTouchpadUrl";
 
+// Register service worker for PWA installability (e.g. Brave/Chrome on Android).
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+}
+
 // Samsung (and some other browsers) open "Add to Home screen" without the hash, so the secret is lost.
 // Save the full URL when we have a hash; when opened without a hash, redirect to the saved URL.
 if (!window.location.hash || window.location.hash === "#") {
