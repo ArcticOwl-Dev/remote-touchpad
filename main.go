@@ -20,9 +20,11 @@
 package main
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -43,6 +45,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"tailscale.com/tsnet"
 )
 
 const (
@@ -219,9 +223,10 @@ func secureRandBase64(length int) string {
 func main() {
 	terminal.SetTitle(prettyAppName)
 	var bind, certFile, keyFile, secret string
-	var showVersion bool
+	var showVersion, useTailscale bool
 	var config config
 	flag.BoolVar(&showVersion, "version", false, "show program's version number and exit")
+	flag.BoolVar(&useTailscale, "tailscale", false, "use Tailscale tsnet (app joins tailnet as its own node; requires device auth key in env)")
 	flag.StringVar(&bind, "bind", defaultBind, "bind server to [HOSTNAME]:PORT")
 	flag.StringVar(&secret, "secret", "", "shared secret for client authentication")
 	flag.StringVar(&certFile, "cert", "", "file containing TLS certificate")
@@ -265,7 +270,7 @@ func main() {
 			config.CustomButtons = buttons
 		}
 	}
-	tls := certFile != "" && keyFile != ""
+	tlsEnabled := certFile != "" && keyFile != ""
 	if secret == "" {
 		secret = secureRandBase64(defaultSecretLength)
 	}
@@ -297,26 +302,104 @@ func main() {
 	defer controller.Close()
 	authenticationChallenges := make(chan challenge, authenticationRateBurst)
 	go authenticationChallengeGenerator(secret, authenticationChallenges)
-	listener, err := net.Listen("tcp", bind)
-	if err != nil {
-		log.Fatal(err)
-	}
-	addr := listener.Addr().(*net.TCPAddr)
-	host := ""
-	bindHost, _, err := net.SplitHostPort(bind)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, b := range addr.IP {
-		if b != 0 {
-			host = bindHost
-			break
+
+	var listener net.Listener
+	var url string
+	var err error
+	var useTailscaleHTTPS bool
+	if useTailscale {
+		authKey := os.Getenv("TAILSCALE_TSNET_AUTH_KEY")
+		if authKey == "" {
+			authKey = os.Getenv("TS_AUTHKEY")
 		}
+		if authKey == "" {
+			authKey = os.Getenv("TS_AUTH_KEY")
+		}
+		if authKey == "" {
+			log.Fatal("--tailscale requires a device auth key; set TAILSCALE_TSNET_AUTH_KEY or TS_AUTHKEY")
+		}
+		hostname := os.Getenv("TAILSCALE_TSNET_HOSTNAME")
+		if hostname == "" {
+			hostname = "remote-touchpad"
+		}
+		s := &tsnet.Server{Hostname: hostname, AuthKey: authKey}
+		if err := s.Start(); err != nil {
+			log.Fatalf("tsnet start: %v", err)
+		}
+		defer s.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_, err = s.Up(ctx)
+		if err != nil {
+			log.Fatalf("tsnet up: %v", err)
+		}
+		lc, err := s.LocalClient()
+		if err != nil {
+			log.Fatalf("tsnet LocalClient: %v", err)
+		}
+		domains := s.CertDomains()
+		if len(domains) > 0 {
+			ln443, err := s.Listen("tcp", ":443")
+			if err != nil {
+				log.Printf("tsnet listen :443: %v (serving HTTP on :80 only)", err)
+			} else {
+				listener = tls.NewListener(ln443, &tls.Config{GetCertificate: lc.GetCertificate})
+				url = fmt.Sprintf("https://%s/", domains[0])
+				useTailscaleHTTPS = true
+			}
+		}
+		if !useTailscaleHTTPS {
+			ln, err := s.Listen("tcp", ":80")
+			if err != nil {
+				log.Fatalf("tsnet listen: %v", err)
+			}
+			listener = ln
+			if len(domains) > 0 {
+				url = fmt.Sprintf("http://%s/", domains[0])
+			} else {
+				ip4, ip6 := s.TailscaleIPs()
+				if ip4.IsValid() {
+					url = fmt.Sprintf("http://%s/", net.JoinHostPort(ip4.String(), "80"))
+				} else if ip6.IsValid() {
+					url = fmt.Sprintf("http://[%s]/", net.JoinHostPort(ip6.String(), "80"))
+				} else {
+					log.Fatal("tsnet: no CertDomains or TailscaleIPs available")
+				}
+			}
+		}
+		tlsEnabled = useTailscaleHTTPS
+	} else {
+		listener, err = net.Listen("tcp", bind)
+		if err != nil {
+			log.Fatal(err)
+		}
+		addr := listener.Addr().(*net.TCPAddr)
+		host := ""
+		bindHost, _, err := net.SplitHostPort(bind)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, b := range addr.IP {
+			if b != 0 {
+				host = bindHost
+				break
+			}
+		}
+		if host == "" {
+			host = findDefaultHost()
+		}
+		port := addr.Port
+		domain := host
+		if port != 80 && !tlsEnabled || port != 443 && tlsEnabled {
+			domain = net.JoinHostPort(host, strconv.Itoa(port))
+		}
+		scheme := "http"
+		if tlsEnabled {
+			scheme = "https"
+		}
+		url = fmt.Sprintf("%s://%s/#%s", scheme, domain, secret)
 	}
-	if host == "" {
-		host = findDefaultHost()
-	}
-	port := addr.Port
+
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(webdataFS)))
 	mux.Handle("/ws", websocket.Handler(func(ws *websocket.Conn) {
@@ -326,7 +409,7 @@ func main() {
 		if err := websocket.Message.Receive(ws, &message); err != nil {
 			return
 		}
-		if !challenge.verify(message) {
+		if !useTailscale && !challenge.verify(message) {
 			return
 		}
 		websocket.JSON.Send(ws, config)
@@ -340,26 +423,17 @@ func main() {
 			}
 		}
 	}))
-	domain := host
-	if port != 80 && !tls || port != 443 && tls {
-		domain = net.JoinHostPort(host, strconv.Itoa(port))
-	}
-	scheme := "http"
-	if tls {
-		scheme = "https"
-	}
-	url := fmt.Sprintf("%s://%s/#%s", scheme, domain, secret)
 	fmt.Println(url)
 	if qrCode, err := terminal.GenerateQRCode(url, terminal.SupportsColor(os.Stdout.Fd())); err == nil {
 		fmt.Print(qrCode)
 	} else {
 		log.Printf("QR code error: %v", err)
 	}
-	if !tls {
+	if !tlsEnabled && !useTailscale {
 		fmt.Println("▌   WARNING: TLS is not enabled    ▐")
 		fmt.Println("▌Don't use in an untrusted network!▐")
 	}
-	if tls {
+	if tlsEnabled && !useTailscaleHTTPS {
 		err = http.ServeTLS(listener, mux, certFile, keyFile)
 	} else {
 		err = http.Serve(listener, mux)
