@@ -8,31 +8,18 @@ Supports Flatpak's RemoteDesktop portal (for Wayland), Windows and X11.
 
 ## Building
 
-From a git checkout on Linux, with CGO enabled and X11-related development libraries installed (or use **Nix** so the dev shell supplies them).
+**Nix** (recommended): from the repo root, reproducible build with no local Go toolchain:
 
-- **Make** (recommended): writes the binary to `results/remote-touchpad`.
+```sh
+nix build
+# ./result/bin/remote-touchpad
+```
 
-  ```sh
-  make
-  ```
+To hack with Go and libraries in your environment, use `nix develop` (or `direnv allow` with the included `.envrc`), then for example:
 
-- **Go** without Make:
-
-  ```sh
-  CGO_ENABLED=1 go build -tags portal,uinput,x11 -o results/remote-touchpad .
-  ```
-
-- **Nix** (flake): enter a shell with Go and libraries, then use `make` as above, or build the package without installing a local toolchain:
-
-  ```sh
-  nix develop   # optional; skip if you already have deps
-  make
-  ```
-
-  ```sh
-  nix build
-  # ./result/bin/remote-touchpad
-  ```
+```sh
+CGO_ENABLED=1 go build -tags portal,uinput,x11 -o ./remote-touchpad .
+```
 
 ## Installation
 
@@ -41,7 +28,7 @@ From a git checkout on Linux, with CGO enabled and X11-related development libra
 * [Windows](https://github.com/Unrud/remote-touchpad/releases/latest)
 * Nix (Linux): reproducible dev environment and package. From the repo root:
 
-  * **Develop**: `nix develop` (or `direnv allow` if using [direnv](https://direnv.net/) with the included `.envrc`), then build as in [Building](#building) (e.g. `make`).
+  * **Develop**: `nix develop` (or `direnv allow` if using [direnv](https://direnv.net/) with the included `.envrc`), then build as in [Building](#building) (e.g. `go build`).
   * **Build**: `nix build` — binary at `result/bin/remote-touchpad` (see [Building](#building)).
   * **Install** (e.g. into your profile): `nix profile install .#`
 

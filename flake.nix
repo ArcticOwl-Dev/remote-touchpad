@@ -49,7 +49,6 @@
       default = pkgs.mkShell {
         buildInputs = with pkgs; [
           go
-          gnumake
           xorg.libX11
           xorg.libXrandr
           xorg.libXtst
