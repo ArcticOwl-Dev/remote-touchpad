@@ -16,7 +16,7 @@
         version = "1.6.0";
         src = ./.;
 
-        vendorHash = "sha256-nkzvE59H7adyzveXYFI1NVwIh8chBRrVZZKfLY0fEaw=";
+        vendorHash = "sha256-aI1b63xBr685zU5C200H9IudP6GyBn5gio1srgY9llc=";
 
         buildInputs = with pkgs; [
           xorg.libX11
@@ -49,6 +49,7 @@
       default = pkgs.mkShell {
         buildInputs = with pkgs; [
           go
+          gnumake
           xorg.libX11
           xorg.libXrandr
           xorg.libXtst

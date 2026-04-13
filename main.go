@@ -223,10 +223,13 @@ func secureRandBase64(length int) string {
 func main() {
 	terminal.SetTitle(prettyAppName)
 	var bind, certFile, keyFile, secret string
-	var showVersion, useTailscale bool
+	var showVersion bool
+	var tailscaleHostname string
+	var tailscaleAuthKeyFile string
 	var config config
 	flag.BoolVar(&showVersion, "version", false, "show program's version number and exit")
-	flag.BoolVar(&useTailscale, "tailscale", false, "use Tailscale tsnet (app joins tailnet as its own node; requires device auth key in env)")
+	flag.StringVar(&tailscaleHostname, "tailscale", "", "Tailscale tsnet hostname for this node (empty: do not use Tailscale; non-empty: join tailnet; auth key: -tailscale-auth-key-file or TS_AUTH_KEY)")
+	flag.StringVar(&tailscaleAuthKeyFile, "tailscale-auth-key-file", "", "path to file containing Tailscale device auth key (overrides TS_AUTH_KEY)")
 	flag.StringVar(&bind, "bind", defaultBind, "bind server to [HOSTNAME]:PORT")
 	flag.StringVar(&secret, "secret", "", "shared secret for client authentication")
 	flag.StringVar(&certFile, "cert", "", "file containing TLS certificate")
@@ -307,22 +310,23 @@ func main() {
 	var url string
 	var err error
 	var useTailscaleHTTPS bool
+	tailscaleHostname = strings.TrimSpace(tailscaleHostname)
+	useTailscale := tailscaleHostname != ""
 	if useTailscale {
-		authKey := os.Getenv("TAILSCALE_TSNET_AUTH_KEY")
-		if authKey == "" {
-			authKey = os.Getenv("TS_AUTHKEY")
-		}
-		if authKey == "" {
+		var authKey string
+		if tailscaleAuthKeyFile != "" {
+			data, err := os.ReadFile(tailscaleAuthKeyFile)
+			if err != nil {
+				log.Fatalf("tailscale auth key file: %v", err)
+			}
+			authKey = strings.TrimSpace(string(data))
+		} else {
 			authKey = os.Getenv("TS_AUTH_KEY")
 		}
 		if authKey == "" {
-			log.Fatal("--tailscale requires a device auth key; set TAILSCALE_TSNET_AUTH_KEY or TS_AUTHKEY")
+			log.Fatal("-tailscale requires a device auth key; use -tailscale-auth-key-file or set TS_AUTH_KEY")
 		}
-		hostname := os.Getenv("TAILSCALE_TSNET_HOSTNAME")
-		if hostname == "" {
-			hostname = "remote-touchpad"
-		}
-		s := &tsnet.Server{Hostname: hostname, AuthKey: authKey}
+		s := &tsnet.Server{Hostname: tailscaleHostname, AuthKey: authKey}
 		if err := s.Start(); err != nil {
 			log.Fatalf("tsnet start: %v", err)
 		}
