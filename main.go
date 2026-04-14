@@ -97,7 +97,11 @@ func processCommand(controller inputcontrol.Controller, customButtons []customBu
 			log.Printf("custom button command: %v", err)
 			return nil
 		}
-		go cmd.Wait()
+		go func() {
+			if err := cmd.Wait(); err != nil {
+				log.Printf("custom button [%d]: %v", index, err)
+			}
+		}()
 		return nil
 	}
 	if command == "S" {
