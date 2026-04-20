@@ -1,2 +1,3 @@
 # nix build default out-link
 result
+.direnv

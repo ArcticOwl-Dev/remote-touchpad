@@ -40,6 +40,52 @@ const customCommandsButton = document.getElementById("custom-commands-button");
 const mouseScene = document.getElementById("mouse");
 const sendText = document.getElementById("send-text");
 
+/** @param {HTMLButtonElement} btn @param {{ label?: string, icon?: string }} entry */
+function setCustomButtonContent(btn, entry) {
+    const label = entry.label || "";
+    btn.textContent = "";
+    btn.removeAttribute("title");
+    const raw = (entry.icon || "").trim();
+    if (!raw) {
+        btn.textContent = label;
+        return;
+    }
+    if (raw.toLowerCase().startsWith("data:image/svg+xml")) {
+        const img = document.createElement("img");
+        img.src = raw;
+        img.alt = label;
+        img.className = "custom-button-icon";
+        btn.appendChild(img);
+        if (label) {
+            btn.title = label;
+        }
+        return;
+    }
+    if (raw.length >= 4 && raw.slice(0, 4).toLowerCase() === "<svg") {
+        const doc = new DOMParser().parseFromString(raw, "image/svg+xml");
+        if (doc.querySelector("parsererror")) {
+            btn.textContent = label;
+            return;
+        }
+        const root = doc.documentElement;
+        if (root && root.nodeName.toLowerCase() === "svg") {
+            const svgEl = /** @type {SVGElement} */ (document.importNode(root, true));
+            svgEl.classList.add("custom-button-icon");
+            svgEl.setAttribute("aria-hidden", "true");
+            svgEl.setAttribute("focusable", "false");
+            if (!svgEl.hasAttribute("fill") && !svgEl.querySelector("[fill]")) {
+                svgEl.setAttribute("fill", "currentColor");
+            }
+            btn.appendChild(svgEl);
+            if (label) {
+                btn.title = label;
+            }
+            return;
+        }
+    }
+    btn.textContent = label;
+}
+
 export default class UI {
     #activeScene = null;
     #keysActiveName = "";
@@ -83,7 +129,7 @@ export default class UI {
             for (let i = 0; i < customButtons.length; i += 1) {
                 const entry = customButtons[i];
                 const btn = document.createElement("button");
-                btn.textContent = entry.icon || entry.label || "";
+                setCustomButtonContent(btn, entry);
                 btn.setAttribute("tabindex", "-1");
                 const index = i;
                 btn.addEventListener("click", (event) => {

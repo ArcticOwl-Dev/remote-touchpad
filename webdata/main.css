@@ -197,6 +197,22 @@ textarea:focus {
     height: 100%;
 }
 
+#custom-buttons button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#custom-buttons button .custom-button-icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+}
+
+#custom-buttons button img.custom-button-icon {
+    object-fit: contain;
+}
+
 #text-input {
     align-items: stretch;
     padding: 0;
