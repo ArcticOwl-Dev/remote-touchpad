@@ -50,6 +50,7 @@ const (
 	KeyBackSpace
 	KeyDelete
 	KeyReturn
+	KeyEscape
 	KeyLimit
 )
 

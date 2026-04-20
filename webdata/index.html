@@ -34,6 +34,7 @@
     <textarea class="grow" cols=1 rows=1></textarea>
     <div class="buttons">
         <button onclick="app.showKeys('text-input', 1)">≡</button>
+        <button onclick="app.key(app.KEY_ESCAPE)">Esc</button>
         <button class="grow" id="send-text" data-send-content="➣" data-back-content="⯇"></button>
     </div>
 </div>
@@ -57,7 +58,8 @@
         </div>
     </div>
     <div class="page">
-        <div class="buttons" style="grid-column: 1 / 4">
+        <div class="buttons" style="grid-column: 1 / 5">
+            <button onclick="app.key(app.KEY_ESCAPE)">Esc</button>
             <button onclick="app.key(app.KEY_BACK_SPACE)">⌫</button>
             <button onclick="app.key(app.KEY_RETURN)">⮠</button>
             <button onclick="app.key(app.KEY_DELETE)">⌦</button>

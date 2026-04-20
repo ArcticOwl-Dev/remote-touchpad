@@ -131,6 +131,8 @@ func (p *uinputController) KeyboardKey(key Key) error {
 	switch key {
 	case KeyBackSpace:
 		uinputKey = uinput.KeyBackspace
+	case KeyEscape:
+		uinputKey = uinput.KeyEsc
 	case KeyReturn:
 		uinputKey = uinput.KeyEnter
 	case KeyDelete:

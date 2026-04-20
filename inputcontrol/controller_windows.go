@@ -35,6 +35,7 @@ const (
 	keyeventfUnicode uint32 = 0x4
 
 	vkBack           uint16 = 0x8
+	vkEscape         uint16 = 0x1B
 	vkReturn         uint16 = 0xD
 	vkEnd            uint16 = 0x23
 	vkHome           uint16 = 0x24
@@ -137,6 +138,8 @@ func (p *windowsController) KeyboardKey(key Key) error {
 	switch key {
 	case KeyBackSpace:
 		input.wVk = vkBack
+	case KeyEscape:
+		input.wVk = vkEscape
 	case KeyReturn:
 		input.wVk = vkReturn
 	case KeyEnd:
